@@ -14,7 +14,7 @@ Two parts. Staff wrote the first; you write the second.
 
 Only issues in the course's Path Review repository are candidates:
 
-- Repo: `<ORG>/<PATH-REVIEW-REPO>` <!-- paste your section's repo from the Unit 1 Check-In page -->
+- Repo: codepath/pathreview-ai301-fa26-s1
 
 Do not search, fetch, or grade issues from any other repository, however
 promising. The wider GitHub comes later in the course; for now the field
@@ -36,4 +36,4 @@ you want to avoid. The skill uses this only to RANK the issues your
 rubric accepts, never to change a verdict: fit cannot rescue an issue
 your rubric rejects, and cannot sink one it accepts. -->
 
-(Write a few sentences here.)
+I have experience with Python, JavaScript, React, Node.js, PostgreSQL, GitHub, and basic testing with pytest. I have worked on web applications, REST APIs, database projects, and introductory AI and cybersecurity tasks. I want to improve my Python, debugging, testing, and open-source contribution skills. I prefer issues with clear requirements and a manageable scope, and I would like to avoid issues that require advanced machine learning knowledge or major architectural changes.
