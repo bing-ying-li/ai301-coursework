@@ -1,71 +1,95 @@
 # Unit 2 — Claim and Reproduce
 
-Path: `beat-1-sandbox/unit-2/reproduction.md`
-
-Record of your claim and reproduction on the issue you chose in Unit 1, and of the
-evaluation runs that produced `eval-run.txt`. This file is graded at the path above; a copy
-kept anywhere else in the repository is not read.
-
-Complete every labelled field below. Each is graded on its own; content placed under the wrong
-label is not graded.
-
----
-
 ## Your identity upstream
 
 **GitHub username**
 
-[Your GitHub username, exactly as it appears on your profile — no `@`, no profile URL. Your
-comments upstream are identified by this name.]
-
----
+bing-ying-li
 
 ## Posted upstream
 
 **Claim comment**
 
-[Link to the comment where you claimed the issue. Use the comment's own permalink, not the
-issue page on its own. **Then paste the text of that comment underneath the link** — the
-pasted text is what this field is graded on, so copy across what you actually posted.]
+https://github.com/codepath/pathreview-ai301-fa26-s1/issues/60#issuecomment-5852690258
+
+Hi, I'd like to investigate the FaithfulnessChecker crash when a context chunk has text set to None. I'll run the example and named unit test locally, then report my environment, steps, and observed result here. I used AI assistance to draft this comment, and I'll verify the results myself.
 
 **Reproduction comment**
 
-[Link to the comment where you posted your reproduction. It must record the environment
-(OS, relevant versions, code state), steps a stranger could follow, and what you observed.
-**Then paste the text of that comment underneath the link** — the pasted text is what this
-field is graded on, so copy across what you actually posted.]
+https://github.com/codepath/pathreview-ai301-fa26-s1/issues/60#issuecomment-5852811806
+
+## Reproduction of #60
+
+I reproduced the `TypeError` when a context chunk contains `{"text": None}`.
+
+**Environment**
+
+- OS: Microsoft Windows NT 10.0.26200.0
+- Repository: my fork of `codepath/pathreview-ai301-fa26-s1`
+- Commit: `f89c06fc3ff292df2a04a39ac51319d32a76b779`
+- Python 3.14.5, pytest 9.1.1, structlog 26.1.0
+- I installed pytest and structlog in a local `.venv`. This isolated test did not need a database or application services.
+
+**Steps and results**
+
+From the repository root, I ran:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/unit/test_faithfulness_checker.py -q
+```
+
+Output:
+
+```text
+..x...x......x....x...                             [100%]
+18 passed, 4 xfailed in 0.25s
+```
+
+The test file includes `test_none_context_chunk_text`, marked as an expected failure for #60. I then ran the issue's example directly:
+
+```powershell
+.\.venv\Scripts\python.exe -c "from rag.evaluator.faithfulness_checker import FaithfulnessChecker; FaithfulnessChecker().check('Knows Python.', [{'text': None}])"
+```
+
+The relevant traceback was:
+
+```text
+File "rag\evaluator\faithfulness_checker.py", line 38, in check
+    context_text = " ".join([chunk.get("text", "") for chunk in context_chunks])
+TypeError: sequence item 0: expected str instance, NoneType found
+```
+
+**Expected:** The checker should handle the `None` text value and return a float score, as the named test expects.
+
+**Observed:** The join receives `None` and raises `TypeError`.
+
+I used AI assistance to draft this comment, but I ran these commands and verified the output myself.
 
 ## Eval iterations
 
-Answer all four sections. Quote source text directly; paraphrase does not satisfy these
-fields.
-
 **Run history**
 
-[The agreement score of each run you did, in order. A single run is a complete answer if
-only one run occurred. **The last score in your list must match the agreement line in the
-`eval-run.txt` you committed** — that file is the record of your final run.]
+- The first full attempt stopped with a Windows `cp1252` encoding error and produced no valid agreement score. I enabled UTF-8 mode with `set PYTHONUTF8=1`.
+- Targeted `--only pkg-04` check: 1/1 agreement. This confirmed the encoding problem was fixed; a partial run does not decide the bar.
+- First complete run: 20/20 scored items, all categories matched, PASS.
+- Confirming complete run with `--save-run eval-run.txt`: 20/20 scored items, all categories matched, PASS. This is the harness-written run submitted in `eval-run.txt`.
 
 **Package analysis**
 
-[Pick one scored package (`pkg-01` through `pkg-20` — the four `calib-` packages are never
-scored). Name it by id, say what your rubric decided and what the gold label said, and
-explain why your rubric read it that way.]
+For `pkg-04`, my rubric decided `reject` and the gold label was also `reject`. The candidate claim only says “+1 also seeing this” and asks for a fix. The report says the lines overflow but gives no OS, terminal size, input payload, command, or actual output from the author's environment. In particular, the issue depends on tabs in a multi-line payload and `fzf --read0 --query setcap`; the candidate does not supply a repeatable attempt. Environment, Repeatable steps, and Evidence matches issue therefore cannot pass, so the required-check verdict is reject.
 
 **Check rationale**
 
-[Quote one check from the `rubric.md` you uploaded to `tools/repro-check/`, exactly as it reads now.
-Then say why it reads that way — what you revised to get there, or what you rejected in
-favour of it.]
+My current `Evidence matches issue` check says:
+
+> Output shows the specific reported problem, or a genuine attempt where it did not occur. An unrelated failure or bare assertion does not pass.
+
+I chose this wording because a statement such as “I can confirm” is not itself proof. The output must match the behavior in the issue. The second clause allows an honest cannot-reproduce report when it includes a real attempt and its observed result.
 
 **Trade-offs**
 
-[Every check gives something up. Any one of these is a complete answer: a package whose
-result it changes, a canary you re-ran with `--only`, a case you accept it will miss, or a
-stated reason nothing changed elsewhere. "Nothing changed, and here is how I know" earns
-the point in full when the reason follows.]
+This check rejects reports that may describe a real bug but omit the actual output. `pkg-04` is one example: the author might truly have seen overflow, but the package offers only a claim, so another person cannot verify it. I accept that trade-off to keep the report independently checkable.
 
 ---
 
-Related paths: `eval-run.txt` in this directory; your skill's files in
-`tools/repro-check/`.
+Related paths: `eval-run.txt` in this directory; the skill files in `tools/repro-check/`.
