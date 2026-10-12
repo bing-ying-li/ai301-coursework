@@ -1,61 +1,107 @@
 # Unit 4 — Test and Submit
 
-Path: `beat-1-sandbox/unit-4/pull-request.md`
-
-Record of the pull request you opened against the Path Review repo, and of the evaluation
-runs that produced `eval-run.txt`. This file is graded at the path above; a copy kept
-anywhere else in the repository is not read.
-
-Complete every labelled field below. Each is graded on its own; content placed under the wrong
-label is not graded.
-
----
-
 ## Your pull request
 
 **Pull request**
 
-[Link to the pull request you opened. It must be the pull request's own page on the Path
-Review repo, not your fork's branch page.]
+https://github.com/codepath/pathreview-ai301-fa26-s1/pull/148
 
 **Branch**
 
-[The name of the branch the pull request comes from, exactly as it appears in your fork.
-The naming shape is a type prefix, then the issue number, then a short description. **The
-issue number in the branch name must be the number of the issue the pull request fixes** —
-a name carrying any other number does not satisfy this field.]
+fix/60-none-context-text
 
 ## Eval iterations
 
-Answer all four sections. Quote source text directly; paraphrase does not satisfy these
-fields.
-
 **Run history**
 
-[The agreement score of each run you did, in order. A single run is a complete answer if
-only one run occurred. **The last score in your list must match the agreement line in the
-`eval-run.txt` you committed** — that file is the record of your final run.]
+1. Initial 20-package attempt: 15/19 successfully graded packages agreed.
+   pkg-05 had a Windows cp1252 UnicodeEncodeError, so the harness marked
+   the run partial and did not save eval-run.txt.
+2. Encoding retry with --only pkg-05 and Python UTF-8 mode: 1/1 agreed.
+3. Diagnostic partial run on pkg-08,pkg-11,pkg-16,pkg-19: 1/4 agreed.
+4. After revising evidence interpretation, a partial run on
+   pkg-01,pkg-03,pkg-04,pkg-08,pkg-11,pkg-12,pkg-16,pkg-19:
+   7/8 agreed.
+5. Final complete run: 18/20 scored items agreed, PASS.
+   This is the run saved in eval-run.txt.
+
+The final category results were clear-accept 5/7, not-tested 4/4,
+silent-drift 4/4, standards-wall 2/2, and unreviewable 3/3.
+Every category had at least one match.
 
 **Package analysis**
 
-[Pick one scored package (`pkg-01` through `pkg-20` — the four `calib-` packages are never
-scored). Name it by id, say what your rubric decided and what the gold label said, and
-explain why your rubric read it that way.]
+Package: pkg-08.
+
+In the diagnostic run, my rubric returned reject while the gold label
+was accept. The grader treated the absence of a plan from Thread
+highlights as evidence against the description's statement that the
+plan was posted. It also required a formatter command for the
+description's "code formatted" statement.
+
+The package's Plan context explicitly introduces:
+
+"The accepted plan this PR claims to implement, excerpted from the
+posted plan (with the repro evidence it built on):"
+
+Its description states:
+
+"Requirements: cheatsheets regenerated (no binding changes, no diff);
+code formatted; integration test added; new error text
+internationalised; no UserConfig changes."
+
+The test evidence also reports:
+
+"Integration test
+`stash_untracked_only_errors` passes; `go test ./...` passes;
+`go generate ./...` produces no cheatsheet diff."
+
+I revised the interpretation rules to recognize that Thread highlights
+are excerpts and that a formatting checklist does not automatically
+require a separate formatter transcript. The shown diff and test
+evidence support the bounded guard, error message, and regression test.
+
+In the revised partial run and the final full run, my rubric returned
+accept for pkg-08, matching the gold label.
 
 **Check rationale**
 
-[Quote one check from the `rubric.md` you uploaded to `tools/pr-precheck/`, exactly as it reads now.
-Then say why it reads that way — what you revised to get there, or what you rejected in
-favour of it.]
+The following check is quoted exactly from my uploaded rubric:
+
+| Repository check evidence | Recorded check commands and results compared with the testing requirements in Repo facts or the repository's PR template and contributing guide. | Every applicable required local check has a recorded command and actual outcome, or a concrete attempted-run blocker with its output and coverage limit disclosed. Failed checks are reported with the available explanation, without inventing a cause. Expected "no tests ran" output is reported accurately. Required checks silently skipped or merely promised fail. Pending CI is not treated as a completed local check or a failure unless stated policy requires it before submission. | required |
+
+I kept this check required because a claim that testing happened is
+not enough when required checks were silently skipped. It distinguishes
+missing evidence from a recorded failed command and prevents a failed
+check from being presented as a pass.
+
+After the diagnostic run, I added this interpretation rule:
+
+"A formatting checklist can be satisfied by an explicit
+completion statement unless the policy requires a formatter command
+or log. Do not invent a missing command requirement."
+
+This clarifies the boundary between template completion and executable
+check evidence. It avoids demanding logs the repository did not ask for
+while retaining the requirement to report actual outcomes for required
+checks.
 
 **Trade-offs**
 
-[Every check gives something up. Any one of these is a complete answer: a package whose
-result it changes, a canary you re-ran with `--only`, a case you accept it will miss, or a
-stated reason nothing changed elsewhere. "Nothing changed, and here is how I know" earns
-the point in full when the reason follows.]
+Accepting concise recorded outcomes and treating diffs and thread
+highlights as excerpts makes the rubric less strict about missing
+incidental details. It could miss an inaccurate completion statement
+when the bundle contains no evidence contradicting it. I accept that
+limit rather than reconstructing omitted repository internals or
+inventing requirements.
 
----
+I re-ran canaries from all four rejection categories:
+pkg-01 (standards-wall), pkg-03 (silent-drift), pkg-04 (not-tested),
+and pkg-12 (unreviewable). All remained reject and matched their gold
+labels in the revised partial run.
 
-Related paths: `eval-run.txt` in this directory; your skill's files in
-`tools/pr-precheck/`.
+The final full run matched every reject package, but falsely rejected
+pkg-13 and pkg-16. The revisions improved pkg-08 and pkg-11 without
+eliminating every false rejection. I retained these limitations and
+submitted the complete 18/20 run rather than adding package-specific
+exceptions.

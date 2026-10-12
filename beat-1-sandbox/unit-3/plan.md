@@ -1,94 +1,115 @@
 # Plan: Issue #60 — Faithfulness checker crashes when a context chunk has `text: None`
 
 Issue: https://github.com/codepath/pathreview-ai301-fa26-s1/issues/60
-Base commit: `f89c06fc3ff292df2a04a39ac51319d32a76b779` (`main`)
-Labels: `bug`, `good first issue`, `rag`, `tier-1`
+Base commit: `f89c06fc3ff292df2a04a39ac51319d32a76b779`
+Implementation commit: `70cf0d7b22cd7948172525ae33702fdf6de83d22`
+Branch: `fix/60-none-context-text`
 
 ## Sources read
 
 - `rag/evaluator/faithfulness_checker.py`
 - `tests/unit/test_faithfulness_checker.py`
-- `docs/CONTRIBUTING.md` and `.github/PULL_REQUEST_TEMPLATE.md`
-- Issue #60. The issue body matches the `I-08` entry in `scripts/issues_manifest.json`.
-  The issue also links an open PR, #74 (see Risks / unknowns).
-- My Unit 2 reproduction on the thread:
+- `docs/CONTRIBUTING.md`
+- `.github/PULL_REQUEST_TEMPLATE.md`
+- Issue #60 and the matching `I-08` entry in `scripts/issues_manifest.json`.
+- My Unit 2 reproduction:
   https://github.com/codepath/pathreview-ai301-fa26-s1/issues/60#issuecomment-5852811806
-  (the evidence quoted below comes from it).
-- Thread comments. `gh` is not installed locally. My first read of the issue's web page did
-  not show the comments. A later read through the GitHub API (2026-10-04) found 21
-  comments: my claim and my reproduction, plus claims, reproductions, and plan comments
-  from other students. All of them had `author_association: NONE`, so no maintainer had
-  commented at the time I checked.
+- The issue thread, checked through the GitHub API on 2026-10-04.
+  That read found 21 comments, including claims, reproductions, and
+  plans from students. All had `author_association: NONE`; no
+  maintainer comment was found at that time.
+- The issue linked another contributor's open PR, #74, at the time
+  of the Unit 3 investigation.
+
+These thread observations describe the earlier read, not the current
+thread state. The thread must be checked again before opening my PR.
 
 ## Diagnosis
 
-`FaithfulnessChecker.check()` builds the context string at
-`rag/evaluator/faithfulness_checker.py:38`:
+`FaithfulnessChecker.check()` assembled context with:
 
 ```python
 context_text = " ".join([chunk.get("text", "") for chunk in context_chunks])
 ```
 
-`dict.get(key, default)` returns the default only when the key is **missing**. When the
-key exists with value `None`, `.get()` returns `None`, so `str.join` gets a non-string
-item and raises `TypeError`. The crash happens after claim extraction, so it only shows up
-when the feedback has at least one extractable claim (a sentence over 10 characters).
+`dict.get(key, default)` uses the default only when the key is missing.
+When `text` exists with value `None`, it returns `None`. Passing that
+value to `str.join` raises:
 
-## Verified Unit 2 evidence
-
-Command:
-
-```
-.\.venv\Scripts\python.exe -m pytest tests/unit/test_faithfulness_checker.py -q
-```
-
-Output:
-
-```
-18 passed, 4 xfailed in 0.25s
-```
-
-Command:
-
-```
-.\.venv\Scripts\python.exe -c "from rag.evaluator.faithfulness_checker import FaithfulnessChecker; FaithfulnessChecker().check('Knows Python.', [{'text': None}])"
-```
-
-Output:
-
-```
+```text
 TypeError: sequence item 0: expected str instance, NoneType found
 ```
 
-The four xfails are three `issue #59` tests plus `test_none_context_chunk_text` (`issue #60`).
+The crash occurs after claim extraction. Reproduction therefore needs
+feedback containing at least one extractable claim: a sentence longer
+than 10 characters.
+
+## Verified Unit 2 evidence
+
+The original reproduction used:
+
+```cmd
+.venv\Scripts\python.exe -c "from rag.evaluator.faithfulness_checker import FaithfulnessChecker; FaithfulnessChecker().check('Knows Python.', [{'text': None}])"
+```
+
+Before implementation, this raised:
+
+```text
+TypeError: sequence item 0: expected str instance, NoneType found
+```
+
+Exit code: 1.
+
+The original checker test file reported:
+
+```text
+18 passed, 4 xfailed
+```
+
+The four expected failures were the three issue #59 tests and
+`test_none_context_chunk_text` for issue #60.
+
+The saved before transcript was recorded on the base commit before
+implementation. Its actual recorded timing was:
+
+```text
+18 passed, 4 xfailed in 0.10s
+```
+
+Forcing the issue #60 test to run with `--runxfail` produced one failed
+test with the same TypeError and exit code 1. The original transcript
+is included in `test_evidence.md`.
 
 ## Scope
 
 In scope:
-- Treat an explicit `None` context `text` as empty text before joining.
-- Keep current behavior for string `text` values and for chunks with no `text` key (both
-  already contribute `""` or the string itself).
+
+- Treat explicit `None` context text as empty text before joining.
+- Preserve existing behavior for string text and missing `text` keys.
+- Remove only the issue #60 expected-failure marker.
+- Strengthen the existing test and add focused regression tests.
 
 Out of scope:
-- Converting `None` to a string. `str(None)` would add the token `"none"` to the context,
-  so it must not happen.
-- Any change to `_extract_claims`, `_is_supported`, the stop-word list, or scoring.
-- Issue #59 (short claims can never be supported). Its three `strict=True` xfail tests stay
-  as they are.
-- Other non-string `text` values (e.g. `int`, `list`). They still raise as they do today.
-  The issue only reports `None`.
-- No other files: no `pyproject.toml` change (no #60 suppression exists there), no docs.
+
+- Converting `None` to the string `"None"`.
+- Changing claim extraction, support matching, stop words, or scoring.
+- Fixing issue #59. Its three expected-failure markers remain unchanged.
+- Handling other non-string text values, such as integers and lists.
+  They continue to raise TypeError.
+- Unrelated cleanup, documentation, or configuration changes.
+
+No issue #60 suppression was found in `pyproject.toml`, so no change
+to that file was planned or made.
 
 ## Files
 
-- `rag/evaluator/faithfulness_checker.py`: the one-line context assembly in `check()`.
-- `tests/unit/test_faithfulness_checker.py`: remove the #60 xfail, strengthen the existing
-  test, and add regressions.
+- `rag/evaluator/faithfulness_checker.py`
+- `tests/unit/test_faithfulness_checker.py`
 
 ## Approach
 
-1. **Checker.** Replace only the context-assembly line so that a `None` value becomes `""`,
-   for example:
+1. Replace only the context assembly in `check()` with an explicit
+   `is None` check:
 
    ```python
    context_text = " ".join(
@@ -96,123 +117,158 @@ Out of scope:
    )
    ```
 
-   This uses an explicit `is None` check instead of `chunk.get("text") or ""`, so only
-   `None` is normalized and other values are not coerced by truthiness. A missing key still
-   gives `""` (`get` returns `None`, which then maps to `""`), the same as today.
+   This normalizes None without coercing other values by truthiness.
+   A missing key also contributes an empty string, preserving its
+   existing behavior.
 
-2. **Remove the #60 xfail.** Delete only the `@pytest.mark.xfail(strict=True, reason="issue #60: ...")`
-   decorator on `test_none_context_chunk_text`, as `docs/CONTRIBUTING.md` requires for
-   seeded bugs. Leave the three `issue #59` decorators unchanged.
+2. Remove the issue #60 `@pytest.mark.xfail` decorator from
+   `test_none_context_chunk_text`. Leave issue #59 markers unchanged.
 
-3. **Strengthen the existing None test.** `"Has Python skills"` yields one extractable claim
-   (17 characters), and empty context cannot support it, so assert `score == 0.0` in place
-   of the loose `0.0 <= score <= 1.0` range.
+3. Strengthen the existing None test to assert `score == 0.0`.
+   Its feedback produces an extractable claim, and empty context
+   cannot support that claim.
 
-4. **Add a mixed valid-text/None regression.** Use feedback with a claim over 10 characters
-   and at least two meaningful (non-stop-word) tokens that match the valid chunk, e.g.
-   - feedback: `"The developer has strong Python skills."`
-   - valid chunk: `{"text": "Strong Python skills shown in projects."}` (matches
-     `strong`, `python`, `skills`)
+4. Add a mixed valid-text/None regression using:
 
-   Assert that `check(feedback, [valid, {"text": None}]) == check(feedback, [valid])` and that
-   the score is `1.0`.
+   - Feedback: `"The developer has strong Python skills."`
+   - Valid context: `{"text": "Strong Python skills shown in projects."}`
 
-5. **Cover None together with a missing key and an empty string.** Add a test with
-   `[{"text": None}, {"content": "..."}, {"text": ""}, valid]`. It should give the same
-   `1.0` as `[valid]` alone, which shows all three empty forms are treated alike.
+   Assert that valid context alone scores 1.0 and adding a None-text
+   chunk preserves that score.
 
-## Test commands and expected outcomes
+5. Add a combined None, missing-key, empty-string, and valid-text test.
+   The original plan expected the combined input to score 1.0, matching
+   valid context alone. The implemented variation is recorded below.
 
-Before implementation (record actual output):
+## Test plan
 
+### Before implementation
+
+Run the existing issue #60 test with its expected-failure marker disabled:
+
+```cmd
+.venv\Scripts\python.exe -m pytest tests/unit/test_faithfulness_checker.py::TestFaithfulnessChecker::test_none_context_chunk_text -q --runxfail
 ```
-.\.venv\Scripts\python.exe -m pytest tests/unit/test_faithfulness_checker.py::TestFaithfulnessChecker::test_none_context_chunk_text -q --runxfail
+
+Expected: one failure with the reported TypeError.
+
+Run the Unit 2 reproduction command. Expected: the same TypeError.
+
+### After implementation
+
+Re-run the checker test file:
+
+```cmd
+.venv\Scripts\python.exe -m pytest tests/unit/test_faithfulness_checker.py -q
 ```
 
-Expected: 1 failed, with `TypeError: sequence item 0: expected str instance, NoneType found`.
+Expected: the issue #60 test and new regressions pass, while the three
+issue #59 tests remain xfailed.
 
-After implementation (record actual output):
+Re-run the Unit 2 reproduction unchanged. Expected: no TypeError.
 
-1. Re-run the exact Unit 2 commands:
-   - `.\.venv\Scripts\python.exe -m pytest tests/unit/test_faithfulness_checker.py -q`.
-     Expected: the #60 test and the new regressions pass, and the three #59 tests stay
-     `xfailed` (no `XPASS(strict)`).
-   - `.\.venv\Scripts\python.exe -c "from rag.evaluator.faithfulness_checker import FaithfulnessChecker; print(FaithfulnessChecker().check('Knows Python.', [{'text': None}]))"`.
-     Expected: no `TypeError`, and the call returns **`0.0`**. I added `print(...)` so the
-     return value is visible.
-     - Correction to the earlier draft expectation of `0.5`: `"Knows Python"` is 12
-       characters, which passes the `> 10` filter in `_extract_claims`, so the claim is
-       **not** filtered out. With empty context it is unsupported, so the score is `0.0`.
-       I confirmed this on the base commit without changing any code:
-       `_extract_claims('Knows Python.')` returns `['Knows Python']`, and
-       `check('Knows Python.', [{'content': 'x'}])` and `check('Knows Python.', [{'text': ''}])`
-       both return `0.0`. So `None` will behave exactly like a missing key or an empty
-       string. `0.5` comes only from feedback that has no claims over 10 characters, and
-       this fix does not touch that path.
-2. `... pytest ...::test_none_context_chunk_text -q --runxfail`. Expected: 1 passed.
-3. Repository checks from CONTRIBUTING: `make lint`, `make typecheck`, `make test-unit`
-   (and `make format` check). Expected: no new findings in the two touched files.
+Expose the return value with:
 
-## Risks / unknowns
+```cmd
+.venv\Scripts\python.exe -c "from rag.evaluator.faithfulness_checker import FaithfulnessChecker; print(FaithfulnessChecker().check('Knows Python.', [{'text': None}]))"
+```
 
-- PR #74 is another contributor's open PR. The house rules say credit attaches to my own
-  posted plan, branch, and PR rather than being first. I will complete my independent course
-  implementation and acknowledge #74; this does not imply that maintainers will merge
-  duplicate fixes.
-- **`or ""` vs `is None`.** The two differ only for falsy non-string values. My plan
-  normalizes only `None`, which keeps the change as narrow as the issue.
-- **Non-string, non-None `text` values** still raise `TypeError`. This is deliberately out
-  of scope, and I will mention it in the PR as a possible follow-up.
-- **Thread state can change.** The comment list above reflects the API read on 2026-10-04.
-  Before posting and before opening the PR, I will check again for maintainer comments or
-  instructions.
-- **Exact pass counts after the fix** depend on how many regression tests I add, so they
-  are not predicted here.
+Expected: 0.0. `"Knows Python"` passes the claim-length filter, so empty
+context produces an unsupported claim rather than the no-claims
+default of 0.5.
+
+Run the targeted issue #60 test with `--runxfail` again.
+Expected: one passed test.
+
+Run repository validation:
+
+- `make test-unit`
+- `make lint`
+- `make typecheck`
+- Check formatting without rewriting unrelated files.
+
+Unit 4 additionally requires attempting `make test-integration` and
+recording its actual result.
+
+## Risks and unknowns
+
+- Another contributor's PR does not block an independent course PR.
+  The earlier investigation identified PR #74; its current status
+  has not been established in this document.
+- An explicit `is None` check keeps the fix limited to the reported
+  input rather than normalizing all falsy values.
+- Other non-string, non-None values remain unsupported and may be
+  considered separately.
+- Thread instructions can change and require a fresh check before
+  opening the PR.
+- Local checks do not establish that GitHub CI is green.
 
 ## Deviations
 
-Implementation followed the two-file scope. The only files changed were
-`rag/evaluator/faithfulness_checker.py` and `tests/unit/test_faithfulness_checker.py`. The
-three `issue #59` xfail decorators are unchanged.
+### Combined empty-context test
 
-- **Approach step 5.** The combined None/missing-key/empty-string test
-  (`test_none_missing_key_and_empty_text_chunks`) uses only empty context and expects `0.0`.
-  The plan had it add a valid chunk and expect `1.0`. In the test, the missing-key chunk
-  holds matching words under `content`, so `0.0` also shows that this chunk is ignored. The
-  separate mixed valid/None test (`test_none_chunk_alongside_valid_chunk`) checks that support
-  is preserved: the score is `1.0` both for valid text alone and for valid text plus a
-  `None` chunk.
-- **How commands were run.** The before and after commands were run from Git Bash as
-  `.venv/Scripts/python.exe ...`, not from PowerShell as `.\.venv\Scripts\python.exe ...`.
-  The interpreter and arguments were the same.
-- **Validation tooling.** `make` is not installed, so I ran the underlying Makefile commands
-  directly. At first `.venv` contained only `pytest` and `structlog`, so I installed the
-  repository-declared dependencies with `.venv/Scripts/python.exe -m pip install -e ".[dev]"`,
-  the Makefile setup step (ruff 0.16.10, black 26.10.0, mypy 2.4.0). No dependency or
-  configuration files were changed. For `make format` I ran `black --check .` instead of
-  `black .`, so no files were rewritten.
+The implemented `test_none_missing_key_and_empty_text_chunks` uses
+only None, a missing text key, and an empty string, and expects 0.0.
+The original step 5 included a valid chunk and expected 1.0.
 
-Evidence is saved outside the repository: before in `C:/Users/0051l/Downloads/issue60-before.txt`,
-after in `C:/Users/0051l/Downloads/issue60-after.txt`. Both were captured on branch
-`fix/60-none-context-text` at `f89c06f`, before the commit. The implementation is now
-committed as `70cf0d7b22cd7948172525ae33702fdf6de83d22`.
+The missing-key chunk contains matching words under `content`.
+The 0.0 result therefore also confirms that `content` is not used
+as a substitute for `text`.
 
-| Command | Before | After |
+The separate `test_none_chunk_alongside_valid_chunk` verifies that a
+valid chunk scores 1.0 both alone and alongside a None-text chunk.
+
+### Validation tooling
+
+make is not installed locally. Validation used the same underlying
+commands specified in the Makefile, with the project's virtual
+environment.
+
+During Unit 3, repository-declared development dependencies were
+installed using `python -m pip install -e ".[dev]"`. No dependency or
+configuration files were changed.
+
+For formatting, Unit 3 used `black --check .` instead of the mutating
+`black .` target. It reported 110 files would be left unchanged.
+
+Earlier validation ran in Git Bash. The current Unit 4 validation ran
+in CMD with equivalent interpreter paths and arguments.
+
+## Current implementation and validation
+
+The two-file implementation is committed at:
+
+```text
+70cf0d7b22cd7948172525ae33702fdf6de83d22
+```
+
+The issue #60 xfail marker was removed. The issue #59 markers remain.
+
+Current Unit 4 results:
+
+| Check | Recorded result | Exit code |
 |---|---|---|
-| `pytest tests/unit/test_faithfulness_checker.py -q` | `18 passed, 4 xfailed`, exit 0 | `21 passed, 3 xfailed`, exit 0 |
-| `pytest ...::test_none_context_chunk_text -q --runxfail` | `1 failed` (`TypeError` at line 38), exit 1 | `1 passed`, exit 0 |
-| Unit 2 reproduction (`check('Knows Python.', [{'text': None}])`) | `TypeError: sequence item 0: expected str instance, NoneType found`, exit 1 | no error, exit 0 |
-| Same reproduction wrapped in `print(...)` | not run | `0.0`, exit 0 |
+| Original Unit 2 reproduction | No TypeError; log reports score 0.0 | 0 |
+| Reproduction with print | Returns 0.0 | Not separately captured |
+| Checker test file | 21 passed, 3 xfailed in 0.27s | Not separately captured |
+| Unit suite | 378 passed, 52 xfailed, 1 warning in 8.48s | 0 |
+| Integration | Collected 0 items; no tests ran in 0.13s | 5 |
+| Lint | All checks passed! | 0 |
+| Typecheck | No issues found in 76 source files | 0 |
 
-Validation on the fixed working tree (all exit 0, no failing checks):
+The unit-suite output also contains an un-awaited coroutine
+RuntimeWarning, in addition to the Pydantic warning in the pytest
+summary. The raw warnings are retained in `test_evidence.md`.
 
-- `ruff check .` (lint): `All checks passed!`
-- `black --check .` (format): `110 files would be left unchanged.`
-- `mypy api/ core/ ingestion/ rag/ agent/ safety/` (typecheck): `Success: no issues found in 76 source files`
-- `pytest tests/unit -v -m unit` (unit tests): `378 passed, 52 xfailed, 2 warnings`. Both
-  warnings come from files this change does not touch: a Pydantic deprecation in
-  `core/config.py` and an un-awaited `AsyncMock` coroutine warning in
-  `tests/unit/test_semantic_chunker.py`.
+Integration's no-tests result matches the course instructions.
+It is recorded as no tests ran, not as a passing integration suite.
 
-Not run locally: `make test-integration` and the frontend job. CI runs both, and my plan did
-not include them. Whether CI is green will be confirmed on the PR.
+The before transcript and current validation output are collected
+in `test_evidence.md`. Frontend validation was attempted. The implementation commit produced
+17 passed and one 5000ms timeout in the portfolio URL character-limit
+test on three runs. Baseline main passed once in a temporary worktree;
+the implementation commit then timed out in that same worktree.
+Frontend files are identical between the two commits. The timeout's
+cause remains unresolved, and no frontend changes were made.
+Formatting was also rechecked: 110 files unchanged, exit 0.
+GitHub CI has not yet been verified.
