@@ -55,10 +55,9 @@ happened; these entries are the toolkit's own timeline.
 All four entries are graded. Keep every heading below, and fill each
 one in the week it belongs to.
 
-**Unit 5: [one line on the tool work]**
+**Unit 5: Built and refined my issue scout — 2026-10-18**
 
-[2-4 sentences: what you built (the scout, your strategy), what broke
-or fell short, what changed because of it.]
+I upgraded issue-select to issue-scout and wrote a Python search strategy that removes assigned issues and ranks candidates by fewest comments, then most recent update. My first scan accepted four of five candidates, but the rubric lacked a specific check for problems already fixed or work only a maintainer could complete, so I added that check while keeping failed reproduction alone from causing rejection. I then graded three issues from the course selection site: the scout accepted Blueprints #229 and rejected Red-DiscordBot #6794 because existing pull requests already covered it. It also rejected CTSM #1621 as already fixed despite incomplete evidence, so I recorded that verdict as needing verification and partial fixes as a remaining rubric gap.
 
 **Unit 6: [one line on the tool work]**
 
