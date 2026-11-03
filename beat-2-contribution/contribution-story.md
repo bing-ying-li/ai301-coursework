@@ -93,26 +93,35 @@ Ocelot-Social is the most full-stack repo of my candidates (GraphQL, Node.js, an
 
 **Problem Description**
 
-[In your own words, what is broken or missing?]
+Ocelot-Social's post and comment editor has no keyboard shortcut for links. Bold, italic and underline have Ctrl+B/I/U, but the only way to add a link is to select text and click the toolbar's link button. The issue says that click-only path is an accessibility gap, for example for screen-reader users. Nothing is broken; the feature was never built. The tiptap issue it links (ueberdosis/tiptap#1886) says the shortcut belongs to the app's UI, not to tiptap. The issue asks for two things: a keyboard shortcut that opens the link popup, and the toolbar legend updated to show it (#3673).
 
 **Expected Behavior**
 
-[What should happen?]
+With text selected, Ctrl+K (Cmd+K on a Mac) opens the same URL popup the toolbar button opens, and the browser doesn't run its own Ctrl+K action. Entering a URL links the selected text. The editor's legend lists the shortcut next to the link entry, as it already does `ctrl + b` for bold.
 
 **Current Behavior**
 
-[What actually happens?]
+Ctrl+K and Cmd+K do nothing in the editor. In my reproduction on `master` at `d5629679f` (jsdom), `Ctrl+K: defaultPrevented=false isLinkInputActive=false linkInputShown=false html=<p>Example text</p>`. That means the event isn't handled, the popup stays closed, and the text is unchanged. Two controls show the setup itself works: Ctrl+B makes the text bold, and clicking the toolbar button opens the popup. The legend's link entry has an empty shortcut (`shortcut: ''`, `MenuLegend.vue:64`).
 
 **Affected Components**
 
-[Which parts of the codebase are involved?]
+All in `webapp/components/Editor/` (tiptap ~1.32, Vue 2.7, Nuxt 2):
+
+- `Editor.vue` builds the tiptap editor and its extension list. It owns the link popup (`isLinkInputActive`, `toggleLinkInput`, `enterLink`, `setLinkUrl`).
+- `MenuBar.vue` holds the toolbar link button, the only code that opens the popup today.
+- `ContextMenu.vue` positions the popup (tippy.js) next to an anchor element.
+- `MenuLegend.vue` holds the shortcut legend.
+- `plugins/eventHandler.js` and `nodes/Link.js` are the existing editor extensions; neither binds a key.
+- Tests are in `Editor.spec.js` (Jest + @vue/test-utils).
+
+`defaultExtensions.js` is shared with the read-only `ContentViewer.vue`, so the shortcut must not go there. The backend isn't involved.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: Claude Code reading `webapp/components/Editor/` and its dependencies at commit `d5629679f`, with my `CLAUDE.local.md` repo-memory file keeping the conventions, file map and verified commands in one place. I checked each claimed code fact against the file and line it cites.
+- What it produced: the file map above and a list of confirmed code facts, with file and line references, that `plan.md` §3 reuses. One example: `toggleLinkInput` only opens the popup when it gets both link attributes and an anchor element, and only the toolbar button passes an element.
+- Difficulties: jsdom's `navigator.platform` is empty, so `Mod-` means Ctrl in tests, and my "Cmd+K" result only shows a Meta key event on a non-Mac platform. The legend shows "ctrl" even on a Mac. The open tiptap-upgrade draft PR #7232 rewrites these files, so I had to check it was inactive before relying on the current code.
+- What changed: I wrote the Mac limit into the reproduction and the plan instead of claiming Cmd+K was tested. I recorded the shared `defaultExtensions.js` as a reason to register the shortcut in `Editor.vue` only. I learned to trace the existing toolbar flow before choosing where to add the shortcut. I also learned that simulating a Meta key event in jsdom does not establish how the editor behaves on a real Mac.
 
 ---
 
@@ -309,31 +318,64 @@ describe('#4666 reproduction: keyboard shortcut for a link', () => {
 
 ## Solution Approach
 
+My full plan is `plan.md` in my Ocelot-Social clone. It and a short plan comment (`plan-comment.md`) stay local: Unit 7 keeps the plan comment off GitHub, so maintainers will first see my approach in the PR description.
+
 **Analysis**
 
-[Your analysis of the root cause: what is causing the issue, traced
-to the files and functions involved.]
+Nothing is broken: the shortcut was never built. The link popup opens only through `toggleLinkInput(attrs, element)` in `Editor.vue` (lines 454-468), and it only opens when it gets both the link attributes and an element to anchor the popup to. The only caller that passes an element is the toolbar button (`MenuBar.vue:49`, `event.target.closest('button')`). No key binding for links exists anywhere in `webapp/components/Editor/`:
+- tiptap-extensions' `Link` mark has no `keys()`, though `Italic` and `Underline` do.
+- Ocelot's `nodes/Link.js` only changes the schema and paste rules.
+- `plugins/eventHandler.js` only transforms pasted text.
+
+So Ctrl+K falls through the editor's keymap unhandled. That matches the reproduction: `defaultPrevented=false`, and the popup stays closed, while Ctrl+B (which has a binding) is prevented and works. Underneath, prosemirror-keymap reads `Mod-k` as Cmd on a Mac and Ctrl elsewhere, and a binding that returns `true` makes ProseMirror call `preventDefault()`. The legend's empty `shortcut: ''` for links (`MenuLegend.vue:64`) is the issue's second task.
 
 **Proposed Solution**
 
-[High-level description of your fix approach, and what you are
-deliberately NOT changing.]
+Reuse the existing popup instead of building a new one. A small tiptap `Extension` binds `Mod-k` (Ctrl+K, or Cmd+K on a Mac) and calls the same `toggleLinkInput` the toolbar uses, anchored to the toolbar link button. That way `enterLink` and `setLinkUrl` link the selected text unchanged, and pressing the shortcut again closes the popup. I register it only in `Editor.vue`, so the read-only `ContentViewer` doesn't get it. The legend's link entry becomes `ctrl + k`.
+
+I'm deliberately not changing:
+- the legend's "ctrl" text on a Mac;
+- what happens with an empty selection (it follows the toolbar);
+- anchoring at the text cursor (only if maintainers ask);
+- `nodes/Link.js` or `defaultExtensions.js`;
+- the inactive tiptap-upgrade draft PR #7232;
+- any other shortcut.
 
 **Implementation Plan**
 
-1. [Modify file X to do Y]
-2. [Add or change Z]
-3. [Update tests]
+1. Add `webapp/components/Editor/plugins/linkShortcut.js`, a tiptap `Extension` whose `keys()` returns `{ 'Mod-k': () => { this.options.onShortcut(); return true } }`. Register it in `Editor.vue` next to `new EventHandler()`.
+2. In `Editor.vue`, add the method the extension calls: `this.toggleLinkInput(this.editor.getMarkAttrs('link'), <toolbar link button>)`. Add `ref="menuBar"` to `<menu-bar>` in `Editor.vue` and `ref="linkButton"` to the link button in `MenuBar.vue`, so the anchor is `this.$refs.menuBar.$refs.linkButton.$el`. If that ref doesn't resolve, fall back to a scoped `querySelector` and raise it in review.
+3. On the URL input in `Editor.vue`, add `@keydown.native.ctrl.k.prevent` and `@keydown.native.meta.k.prevent` handlers that call `toggleLinkInput()`. The input sits outside the editor's DOM, so pressing the shortcut again there closes the popup instead of reaching the browser.
+4. In `MenuLegend.vue:64`, set the link entry's shortcut to `ctrl + k`.
+5. Tests, in a new `describe('link shortcut')` block in `Editor.spec.js`, starting from `<p>Example text</p>` fully selected:
+   - **A:** Ctrl+K is prevented, `isLinkInputActive` is true, the input is visible, and the popup is anchored to the toolbar link button. The reproduction showed false / false / hidden.
+   - **B:** entering `https://example.org` and pressing Enter links `Example text`.
+   - **C:** Ctrl+K again closes the popup with no link added.
+   - **D:** Ctrl+B and the toolbar button still work.
+   - **E:** Cmd+K, in its own spec file with `navigator.platform` mocked as Mac before the editor loads. I'll first check the mock with Cmd+B on unchanged code.
+   - **F (optional):** a `MenuLegend` check that the link row shows `ctrl + k`.
+6. Run the same checks as my unchanged-upstream baseline (2026-11-02): webapp lint, design tokens, and the full webapp unit suite with its 95% coverage gate inside CI's Docker `test` image. The baseline was 0 lint errors, tokens exit 0, and 293/293 suites, 4429/4429 tests, 96.47% line coverage. My ship-gate manifest covers exactly these three. Backend and end-to-end tests have not run locally; CI will run them on the PR, and I won't describe all of the repository's checks as passing.
+7. Check in real browsers (Storybook's `Editor` story): Chrome and Firefox on Windows, keyboard-only focus, and NVDA. I'll ask a reviewer to check Cmd+K on a Mac, since I don't have one.
 
-[Record deviations here as they happen: what changed mid-build and
-why. A recorded deviation is honest work; silent drift is not.]
+Deviations: none yet. Nothing has been built. Before building I removed my earlier idea of posting a short version of the plan on the issue: Unit 7 keeps the plan comment local, so the anchor question will go in the `[WIP]` PR description instead.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
+- Tool: plan-check in live mode on `plan.md` and `plan-comment.md` for #4666, graded against the live thread (no maintainer reply, no assignee, no open PR on 2026-11-02). Before that, I used my ship-gate manifest to run the project's own checks on unchanged upstream, so the plan's test commands are the ones I verified.
+- What it produced: **accept** on the first run, with all seven required checks passing. It flagged two voice-guide notes on the comment: it shows the output but not the jest command, and nobody can rerun the local test without its source. It also found three procedure gaps:
+  - the live mode expects a posted repro comment, and mine was deliberately not posted;
+  - it expects `comment.md`;
+  - it doesn't say how to grade a comment that stays local.
 - Difficulties:
+  - **Native Windows run of the full suite:** it failed 27 tests in 5 suites, all POSIX-path assumptions. Upstream CI was green on the same commit, so it was my platform, and I moved the full suite to CI's Docker image.
+  - **Lint:** it first failed with about 146,800 CRLF errors because of Git for Windows' `core.autocrlf=true`.
+  - **Missing Node:** the portable Node v26.8.1 I'd used before was gone.
+  - **Grading independence:** plan-check ran in the same Claude Code session that drafted the plan, so its accept isn't an independent read.
 - What changed:
+  - I reinstalled Node v26.8.1 at a fixed path, set `core.autocrlf=false` for the clone only, and recorded both and the Docker command in `CLAUDE.local.md`.
+  - The plan's test commands now match the baseline, and it states that backend and e2e checks haven't run.
+  - I removed the "post the plan on the issue" step from the plan and from `plan-draft.md`.
+  - For now, I recorded the procedure gaps without changing plan-check. I am keeping the current assessment and its limitation that it ran in the same session as the plan.
 
 ---
 
