@@ -357,7 +357,15 @@ I'm deliberately not changing:
 6. Run the same checks as my unchanged-upstream baseline (2026-11-02): webapp lint, design tokens, and the full webapp unit suite with its 95% coverage gate inside CI's Docker `test` image. The baseline was 0 lint errors, tokens exit 0, and 293/293 suites, 4429/4429 tests, 96.47% line coverage. My ship-gate manifest covers exactly these three. Backend and end-to-end tests have not run locally; CI will run them on the PR, and I won't describe all of the repository's checks as passing.
 7. Check in real browsers (Storybook's `Editor` story): Chrome and Firefox on Windows, keyboard-only focus, and NVDA. I'll ask a reviewer to check Cmd+K on a Mac, since I don't have one.
 
-Deviations: none yet. Nothing has been built. Before building I removed my earlier idea of posting a short version of the plan on the issue: Unit 7 keeps the plan comment local, so the anchor question will go in the `[WIP]` PR description instead.
+Deviations (recorded 2026-11-03, after the build on local branch `4666-link-shortcut`):
+
+- **Approach:** none. The four source changes match steps 1-4. The `this.$refs.menuBar.$refs.linkButton.$el` anchor resolved (test A checks it), so I didn't need the `querySelector` fallback. The new `Editor.vue` method is named `toggleLinkInputByShortcut`.
+- **Tests:**
+  - Optional test F became a new `MenuLegend.spec.js`, because nothing in the suite covered the legend.
+  - Test C's blur check became its own test ("stays closed when the input then loses the focus").
+  - Every test that needs the popup open first asserts that it's showing. Without that, the Enter test (B) passed on the original code, so it didn't tell the fix from the original.
+- **Commands:** local Jest runs in step 5 use `--runInBand`. On my machine, Jest with parallel workers stalled with no output. The three step-6 checks ran unchanged.
+- **Before building:** I removed my earlier idea of posting a short version of the plan on the issue. Unit 7 keeps the plan comment local, so the anchor question will go in the `[WIP]` PR description instead.
 
 **Toolkit**
 
@@ -381,17 +389,64 @@ Deviations: none yet. Nothing has been built. Before building I removed my earli
 
 ## Testing Strategy
 
-[What observable checks prove the fix: your reproduction steps re-run
-against the built change (before and after), and the repo's own test
-suite or checks with the outcome shown. "Tests pass" with nothing
-observable named is not a strategy.]
+Everything here ran on my local branch `4666-link-shortcut`, based on `master` `d5629679f`. The full record is in `test_evidence.md` in my local clone.
+
+1. **The reproduction, re-run on the change.** The same local spec, with `<p>Example text</p>` selected and keys sent to the editor:
+   - Before: `Ctrl+K: defaultPrevented=false isLinkInputActive=false linkInputShown=false`.
+   - After: `Ctrl+K: defaultPrevented=true isLinkInputActive=true linkInputShown=true`.
+   - Its Cmd+K line didn't change. That spec runs with jsdom's empty platform, where `Mod` means Ctrl.
+2. **New regression tests, failing on the original code and passing with the fix.** I ran the final versions of the 14 new tests twice: with the source changes removed, then with them in place.
+   - Original code: 9 failed, 5 passed. The 5 that passed are the controls: toolbar button, Ctrl+B, Cmd+B on a simulated Mac, Ctrl+K left alone on a simulated Mac, and the bold legend row.
+   - With the fix: 14 of 14 passed.
+   - The tests check four things: that Ctrl+K is prevented and opens the popup at the toolbar link button, that Enter links the selected text with the right `href`, that Ctrl+K or Cmd+K inside the input closes it without adding a link, and that the legend shows `ctrl + k`.
+   - Tests that need the popup open first check that it's showing, so they can't pass on the original code.
+3. **Existing Editor tests.** `components/Editor` went from 8 suites and 107 tests to 10 suites and 121 tests, all passing.
+4. **The project's own checks, from my ship manifest, before and after:**
+   - lint: 0 errors with the same 21 existing warnings both times;
+   - design tokens: exit 0 both times;
+   - full webapp unit suite with its 95% coverage gate, in CI's Docker `test` image: 293/293 suites, 4429 tests, 96.47% before; 295/295 suites, 4443 tests, 96.52% after.
+5. **Real browsers, automated.** Playwright drove the installed Chrome 156 and Edge 156 (headless) against Storybook's `Editor` story. It observed in both:
+   - Ctrl+K was prevented, the popup opened next to the link button, and focus moved into the URL input;
+   - Enter produced `<a href="https://example.org" …>Example text</a>`;
+   - Esc and a second Ctrl+K closed the popup and returned focus to the editor;
+   - the toolbar button and Ctrl+B still worked.
+
+   Injected key events don't reach the browser's own shortcut handling, so this run can't show what the address bar does.
+6. **Real keyboard, by me.** In the same story I checked:
+   - Ctrl+K opened the link popup, and typing went straight into the URL input.
+   - Enter changed the selected text's colour, closed the popup, and the next key went into the editor.
+   - Esc and a second Ctrl+K also closed it, with the next key going into the editor.
+
+   An earlier, less careful report of mine, that focus stayed in the URL input, didn't happen again in this retest, so I didn't change the code because of it. The colour change alone doesn't prove the `href`; steps 2 and 5 check that.
+
+**Not run:**
+- backend and end-to-end tests, which CI will run;
+- Firefox, which isn't installed;
+- NVDA;
+- Tab order around the popup;
+- a direct look at the browser's address bar;
+- a real Mac. Cmd+K is only simulated in jsdom with a Mac platform string, which is not the same as testing on macOS.
 
 **Toolkit**
 
 - Tool:
-- What it produced:
+  - Jest, run through Claude Code with `--runInBand` locally;
+  - my ship manifest's three checks, run the way the ship-gate runs them;
+  - Playwright driving the installed Chrome and Edge against Storybook;
+  - my own manual keyboard test.
+- What it produced: the before/after table for the 14 new tests, the before/after reproduction output, the two runs of the project's checks, and the browser results above, all recorded in `test_evidence.md`.
 - Difficulties:
+  - Two of my tests passed on the original code at first.
+  - Storybook needed the project's `fix-storybook-webpack.js` step before it would start.
+  - A leftover Storybook process kept port 3002, so the story ran on 3003.
+  - Injected key events can't show the browser's own Ctrl+K handling.
+  - Firefox and a Mac aren't available to me.
+  - My first manual report about focus was wrong.
 - What changed:
+  - I added "is the popup open" checks to those tests and re-ran the before/after.
+  - I marked the address bar, Firefox, NVDA and real-Mac checks as not run.
+  - I recorded my manual retest as my own evidence, separate from the automated runs.
+  - Next time, I would test one action at a time and check where typing goes after closing the popup, instead of treating a closed popup as proof that focus returned to the editor.
 
 ---
 
@@ -400,20 +455,67 @@ observable named is not a strategy.]
 [A running log, added to as you work. Date each entry. What you
 built, decisions you made when you made them, wrong turns included.]
 
-**[Date]**
+**2026-11-02: baseline for the project's own checks**
 
-[Entry]
+I filled my ship manifest with the three webapp checks CI runs: lint, design tokens, and the full unit suite with its 95% coverage gate. Then I ran them on unchanged `master` (`d5629679f`). It took three setup fixes:
+- The portable Node v26.8.1 I'd used before was gone, so I reinstalled it at a fixed path.
+- Git for Windows' `core.autocrlf=true` checked files out as CRLF, which gave about 146,800 prettier errors. I set `core.autocrlf=false` for the clone only.
+- The full suite failed 27 path-related tests natively on Windows, while upstream CI was green on the same commit. So I moved the suite into CI's Docker `test` image.
 
-**[Date]**
+Baseline: lint 0 errors (21 existing warnings), tokens exit 0, and 293/293 suites, 4429/4429 tests, 96.47% line coverage. plan-check accepted `plan.md` and `plan-comment.md`, which stay local.
 
-[Entry]
+**2026-11-03: building the shortcut**
+
+- I re-ran plan-check on the current `plan.md` and `plan-comment.md`: accept. The issue thread still had only my claim, with no assignee, no competing PR and no new upstream commits. I created the local branch `4666-link-shortcut` from `d5629679f`. It isn't pushed, because the fork-or-upstream-branch question is still open.
+- I wrote the tests before the code.
+  - **Mac platform check first (plan risk 1):** with `navigator.platform` set to `MacIntel` before the editor loads, Cmd+B made the text bold on unchanged code. So the mock works.
+  - **On the original code,** the shortcut tests failed and the controls passed (toolbar button, Ctrl+B, Cmd+B, Ctrl+K left alone on a Mac).
+- I implemented plan steps 1–4:
+  - `plugins/linkShortcut.js` with a `Mod-k` key binding;
+  - `toggleLinkInputByShortcut()` in `Editor.vue`, reusing `toggleLinkInput` and anchored to the toolbar link button through two new refs;
+  - Ctrl+K / Cmd+K handlers on the URL input;
+  - the legend's link entry set to `ctrl + k`.
+- **Wrong turn: a test that passed on the original code.** My first "links the selected text" test passed there, because typing into the hidden input and pressing Enter runs `enterLink` anyway. I added a check that the popup is showing first, and did the same for the new blur test.
+- **Wrong turn: a stalled Jest run.** Jest with parallel workers stalled with no output on my machine, so I ran Jest locally with `--runInBand`.
+- **Wrong turn: lint errors.** Lint found four prettier line-length errors in my new spec code, which I formatted with prettier on the changed files only.
+- **Final before/after with the final tests:** on the original source, 9 failed and 5 passed. With the fix, all 14 passed.
+- **Reproduction spec:** it now records `Ctrl+K: defaultPrevented=true isLinkInputActive=true linkInputShown=true`, where it recorded false/false/false before.
+- **Editor folder:** 121 tests in 10 suites pass, up from 107 tests in 8 suites.
+- **The project's three checks on the change:**
+  - lint: 0 errors, the same 21 warnings;
+  - design tokens: exit 0;
+  - Docker suite: 295/295 suites, 4443/4443 tests, 96.52% line coverage.
+- **Slow Docker run:** it took 1116 s against 268 s for the baseline. Unrelated suites slowed down too (ContributionForm 57 s → 783 s), and my new tests take under 0.2 s each locally. So it looks like a stall in the Docker environment, but it's close to the ship-gate's 25-minute limit.
+- **Not done yet:**
+  - backend and end-to-end tests (not run);
+  - real-browser checks;
+  - a real Mac. Cmd+K is only simulated in jsdom with a Mac platform string.
+
+Nothing is committed, pushed or posted. The details are in `test_evidence.md` in my local clone.
+
+**2026-11-03: browser checks**
+
+- **Starting Storybook:** `npm run storybook` first failed with `Cannot find module 'webpack/lib/rules/BasicEffectRulePlugin'`. The project's `fix-storybook-webpack.js` (the step `build-storybook` runs first) fixed it without any change to project code. The broken first run kept port 3002, so I stopped it, and the story ran on 3003.
+- **Automated Chrome 156 and Edge 156:** Ctrl+K opened the popup next to the link button with focus in the URL input. Enter linked the text with the right `href`. Esc and a second Ctrl+K closed it with focus back in the editor. The toolbar button and Ctrl+B still worked.
+- **My manual retest:** with a real keyboard I saw the same focus behaviour. An earlier report of mine that focus stayed in the URL input didn't happen again, so I left the code as it was.
+- **Still not run:** Firefox, NVDA, a direct check of the address bar, and a real Mac.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
+- Tool: Claude Code on a local branch, working from my accepted `plan.md`. It wrote the tests before the code, ran them on the original and changed source, and logged results to `test_evidence.md`. My ship manifest's checks ran the way the ship-gate runs them.
+- What it produced: four source changes and three test files, all in `webapp/components/Editor/`, with dated notes above and the deviations recorded in my Solution Approach and `plan.md`.
 - Difficulties:
+  - Jest with parallel workers stalled on my machine.
+  - Two tests didn't tell the fix from the original code.
+  - Four prettier errors in my new spec code.
+  - A Docker run four times slower than the baseline, close to the gate's 25-minute limit.
+  - Storybook setup problems.
 - What changed:
+  - I used `--runInBand` locally.
+  - I added "popup is open" checks to those tests.
+  - I formatted only the files I changed.
+  - I recorded the slow Docker run as a risk instead of calling it a pass with no caveat.
+  - I learned that passing automated tests does not replace checking the interaction myself. I would give the tool exact observations and repeat unclear steps before asking it to change the code.
 
 ---
 
