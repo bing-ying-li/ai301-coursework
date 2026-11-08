@@ -66,10 +66,9 @@ I installed the voice guard so my voice guide lives in one canonical file and a 
 
 I used plan-check on `plan.md` and `plan-comment.md` for Ocelot-Social #4666; it returned accept with all seven required checks passing. I installed the ship-gate and wrote a manifest for webapp lint, design tokens, and the full unit suite with its 95% coverage threshold. Windows path assumptions and CRLF line endings broke initial runs, so I kept LF endings in this clone and ran the full suite in the project's Docker test image. On 2026-11-03, the ship-gate returned PASS on branch `4666-link-shortcut`: all three manifest checks and all seven pr-precheck checks passed; I kept the evidence and limitations in the local plan and test files.
 
-**Unit 8: [one line on the tool work]**
+**Unit 8: Installed PR Monitor and reviewed the next action for my pull request — 2026-11-08**
 
-[2-4 sentences: the PR-monitor and your playbook. What it read, what it
-drafted, what you did with the draft.]
+I installed the PR monitor and wrote a playbook covering review responses, waiting periods, reminders, and when to close a PR. I tried to establish a waiting threshold using recently merged Ocelot-Social pull requests, but the five candidates I verified were all submitted by repository members, so I used a conservative seven-day threshold instead of claiming a measured average. The monitor checked PR #10853, reported 106 passing checks and an automated CodeRabbit approval, and drafted a recommendation to wait rather than post a reply. I reviewed its suggestions, decided not to send a comment or make an optional test change, and kept the remaining macOS testing limitation documented.
 
 ---
 
@@ -137,6 +136,7 @@ cd ../../webapp && npm ci
 ```
 
 Challenges:
+
 - **Node version:** `.nvmrc` says 26.8.1, but the webapp Dockerfile uses `node:26.12.1-alpine`. I followed `.nvmrc`, which is what CI's lint job reads.
 - **No Docker:** CI runs the webapp unit tests inside Docker. Docker is installed on my machine, but its daemon wasn't running, so I ran Jest locally, which is the README's local path.
 - **Install scripts:** npm warned that some install scripts aren't covered by `allowScripts`. `webapp/.npmrc` says vue-demi's postinstall must run, so I checked that `node_modules/vue-demi/lib/index.cjs` has `isVue2 = true`.
@@ -176,98 +176,115 @@ Ran all test suites matching components/Editor/repro-4666.local.spec.js.
 
 ```js
 // Reproduction for #4666 only (local, never committed): observes current behaviour, fixes nothing.
-import { mount } from '@vue/test-utils'
-import { TextSelection } from 'prosemirror-state'
-import Editor from './Editor'
+import { mount } from "@vue/test-utils";
+import { TextSelection } from "prosemirror-state";
+import Editor from "./Editor";
 
-import MutationObserver from 'mutation-observer'
-import Vue from 'vue'
+import MutationObserver from "mutation-observer";
+import Vue from "vue";
 
-global.MutationObserver = MutationObserver
+global.MutationObserver = MutationObserver;
 
-const localVue = global.localVue
-const stubs = { transition: false, UserAvatar: true }
+const localVue = global.localVue;
+const stubs = { transition: false, UserAvatar: true };
 
-describe('#4666 reproduction: keyboard shortcut for a link', () => {
-  let wrapper
+describe("#4666 reproduction: keyboard shortcut for a link", () => {
+  let wrapper;
 
   const selectAllText = () => {
-    const { state, dispatch } = wrapper.vm.editor.view
-    dispatch(state.tr.setSelection(TextSelection.create(state.doc, 1, state.doc.content.size - 1)))
-  }
+    const { state, dispatch } = wrapper.vm.editor.view;
+    dispatch(
+      state.tr.setSelection(
+        TextSelection.create(state.doc, 1, state.doc.content.size - 1),
+      ),
+    );
+  };
 
   const pressKey = (key, modifiers) => {
-    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...modifiers })
-    wrapper.vm.editor.view.dom.dispatchEvent(event)
-    return event
-  }
+    const event = new KeyboardEvent("keydown", {
+      key,
+      bubbles: true,
+      cancelable: true,
+      ...modifiers,
+    });
+    wrapper.vm.editor.view.dom.dispatchEvent(event);
+    return event;
+  };
 
-  const linkInputShown = () => wrapper.vm.$refs.linkInput.style.display !== 'none'
+  const linkInputShown = () =>
+    wrapper.vm.$refs.linkInput.style.display !== "none";
 
   beforeEach(async () => {
     wrapper = mount(Editor, {
       mocks: { $t: (key) => key },
-      propsData: { value: '<p>Example text</p>' },
+      propsData: { value: "<p>Example text</p>" },
       localVue,
       sync: false,
       stubs,
-    })
-    await Vue.nextTick()
-    selectAllText()
-    await Vue.nextTick()
-  })
+    });
+    await Vue.nextTick();
+    selectAllText();
+    await Vue.nextTick();
+  });
 
-  afterEach(() => wrapper.destroy())
+  afterEach(() => wrapper.destroy());
 
-  it('setup: the selection covers the text', () => {
-    const { from, to } = wrapper.vm.editor.state.selection
-    expect(wrapper.vm.editor.state.doc.textBetween(from, to)).toBe('Example text')
-    expect(linkInputShown()).toBe(false)
-  })
+  it("setup: the selection covers the text", () => {
+    const { from, to } = wrapper.vm.editor.state.selection;
+    expect(wrapper.vm.editor.state.doc.textBetween(from, to)).toBe(
+      "Example text",
+    );
+    expect(linkInputShown()).toBe(false);
+  });
 
-  it('control: Ctrl+B reaches the editor keymap and makes the selection bold', async () => {
-    const event = pressKey('b', { ctrlKey: true })
-    await Vue.nextTick()
-    console.log('Ctrl+B defaultPrevented:', event.defaultPrevented, 'html:', wrapper.vm.editor.getHTML())
-    expect(event.defaultPrevented).toBe(true)
-    expect(wrapper.vm.editor.getHTML()).toContain('<strong>')
-  })
-
-  it('control: clicking the toolbar link button opens the link input', async () => {
-    const button = wrapper.find('button[aria-label="editor.legend.link"]')
-    expect(button.exists()).toBe(true)
-    await button.trigger('click')
-    await Vue.nextTick()
-    await Vue.nextTick()
+  it("control: Ctrl+B reaches the editor keymap and makes the selection bold", async () => {
+    const event = pressKey("b", { ctrlKey: true });
+    await Vue.nextTick();
     console.log(
-      'after toolbar click:',
+      "Ctrl+B defaultPrevented:",
+      event.defaultPrevented,
+      "html:",
+      wrapper.vm.editor.getHTML(),
+    );
+    expect(event.defaultPrevented).toBe(true);
+    expect(wrapper.vm.editor.getHTML()).toContain("<strong>");
+  });
+
+  it("control: clicking the toolbar link button opens the link input", async () => {
+    const button = wrapper.find('button[aria-label="editor.legend.link"]');
+    expect(button.exists()).toBe(true);
+    await button.trigger("click");
+    await Vue.nextTick();
+    await Vue.nextTick();
+    console.log(
+      "after toolbar click:",
       `isLinkInputActive=${wrapper.vm.isLinkInputActive}`,
       `linkInputShown=${linkInputShown()}`,
       `contextMenuOpen=${!!wrapper.vm.$refs.contextMenu.menu}`,
-    )
-    expect(wrapper.vm.isLinkInputActive).toBe(true)
-    expect(linkInputShown()).toBe(true)
-    expect(wrapper.vm.$refs.contextMenu.menu).toBeTruthy()
-  })
+    );
+    expect(wrapper.vm.isLinkInputActive).toBe(true);
+    expect(linkInputShown()).toBe(true);
+    expect(wrapper.vm.$refs.contextMenu.menu).toBeTruthy();
+  });
 
   it.each([
-    ['Ctrl+K', { ctrlKey: true }],
-    ['Cmd+K', { metaKey: true }],
-  ])('observed: %s does not open the link input', async (name, modifiers) => {
-    const event = pressKey('k', modifiers)
-    await Vue.nextTick()
-    await Vue.nextTick()
+    ["Ctrl+K", { ctrlKey: true }],
+    ["Cmd+K", { metaKey: true }],
+  ])("observed: %s does not open the link input", async (name, modifiers) => {
+    const event = pressKey("k", modifiers);
+    await Vue.nextTick();
+    await Vue.nextTick();
     console.log(
       `${name}: defaultPrevented=${event.defaultPrevented}`,
       `isLinkInputActive=${wrapper.vm.isLinkInputActive}`,
       `linkInputShown=${linkInputShown()}`,
       `html=${wrapper.vm.editor.getHTML()}`,
-    )
-    expect(event.defaultPrevented).toBe(false)
-    expect(wrapper.vm.isLinkInputActive).toBe(false)
-    expect(linkInputShown()).toBe(false)
-  })
-})
+    );
+    expect(event.defaultPrevented).toBe(false);
+    expect(wrapper.vm.isLinkInputActive).toBe(false);
+    expect(linkInputShown()).toBe(false);
+  });
+});
 ```
 
 </details>
@@ -302,6 +319,7 @@ describe('#4666 reproduction: keyboard shortcut for a link', () => {
   - that the AI disclosure is there even though the repo states no policy.
 
   The voice guard also passed.
+
 - Difficulties:
   - A test that only shows Ctrl+K "does nothing" proves nothing alone, so the report needed controls that show the setup can work.
   - My first toolbar control only checked the `isLinkInputActive` flag, not whether the input was actually visible.
@@ -322,6 +340,7 @@ My full plan is `plan.md` in my Ocelot-Social clone. It and a short plan comment
 **Analysis**
 
 Nothing is broken: the shortcut was never built. The link popup opens only through `toggleLinkInput(attrs, element)` in `Editor.vue` (lines 454-468), and it only opens when it gets both the link attributes and an element to anchor the popup to. The only caller that passes an element is the toolbar button (`MenuBar.vue:49`, `event.target.closest('button')`). No key binding for links exists anywhere in `webapp/components/Editor/`:
+
 - tiptap-extensions' `Link` mark has no `keys()`, though `Italic` and `Underline` do.
 - Ocelot's `nodes/Link.js` only changes the schema and paste rules.
 - `plugins/eventHandler.js` only transforms pasted text.
@@ -333,6 +352,7 @@ So Ctrl+K falls through the editor's keymap unhandled. That matches the reproduc
 Reuse the existing popup instead of building a new one. A small tiptap `Extension` binds `Mod-k` (Ctrl+K, or Cmd+K on a Mac) and calls the same `toggleLinkInput` the toolbar uses, anchored to the toolbar link button. That way `enterLink` and `setLinkUrl` link the selected text unchanged, and pressing the shortcut again closes the popup. I register it only in `Editor.vue`, so the read-only `ContentViewer` doesn't get it. The legend's link entry becomes `ctrl + k`.
 
 I'm deliberately not changing:
+
 - the legend's "ctrl" text on a Mac;
 - what happens with an empty selection (it follows the toolbar);
 - anchoring at the text cursor (only if maintainers ask);
@@ -411,6 +431,7 @@ Everything here ran on my local branch `4666-link-shortcut`, based on `master` `
    - the toolbar button and Ctrl+B still worked.
 
    Injected key events don't reach the browser's own shortcut handling, so this run can't show what the address bar does.
+
 6. **Real keyboard, by me.** In the same story I checked:
    - Ctrl+K opened the link popup, and typing went straight into the URL input.
    - Enter changed the selected text's colour, closed the popup, and the next key went into the editor.
@@ -419,6 +440,7 @@ Everything here ran on my local branch `4666-link-shortcut`, based on `master` `
    An earlier, less careful report of mine, that focus stayed in the URL input, didn't happen again in this retest, so I didn't change the code because of it. The colour change alone doesn't prove the `href`; steps 2 and 5 check that.
 
 **Not run:**
+
 - backend and end-to-end tests, which CI will run;
 - Firefox, which isn't installed;
 - NVDA;
@@ -451,12 +473,10 @@ Everything here ran on my local branch `4666-link-shortcut`, based on `master` `
 
 ## Implementation Notes
 
-[A running log, added to as you work. Date each entry. What you
-built, decisions you made when you made them, wrong turns included.]
-
 **2026-11-02: baseline for the project's own checks**
 
 I filled my ship manifest with the three webapp checks CI runs: lint, design tokens, and the full unit suite with its 95% coverage gate. Then I ran them on unchanged `master` (`d5629679f`). It took three setup fixes:
+
 - The portable Node v26.8.1 I'd used before was gone, so I reinstalled it at a fixed path.
 - Git for Windows' `core.autocrlf=true` checked files out as CRLF, which gave about 146,800 prettier errors. I set `core.autocrlf=false` for the clone only.
 - The full suite failed 27 path-related tests natively on Windows, while upstream CI was green on the same commit. So I moved the suite into CI's Docker `test` image.
@@ -541,8 +561,9 @@ The before/after reproduction showed that Ctrl+K changed from `defaultPrevented=
 - **By 2026-11-08:** CodeRabbit's automated review flagged issues around the shortcut legend and interaction with Mention/Hashtag suggestions. I updated the macOS legend to show `cmd + k`, changed the shortcut handling so the suggestion menu closes, and added regression coverage.
 - **By 2026-11-08:** A further review identified that closing suggestions could leave the Vue state inconsistent with an active plugin match. I adjusted the handling and regression test so suggestions can return as typing continues. The focused local tests passed (57/57).
 - **2026-11-08:** CodeRabbit approved the revised PR. GitHub reported 105 successful CI checks, 29 skipped and none failing or pending; the PR was marked mergeable. These results do not mean a human maintainer has merged it.
+- **2026-11-08 (Unit 8 monitoring):** I ran the PR monitor after preparing my playbook. It reported 106 passing checks, 29 skipped or cancelled, and a mergeable PR. The latest approval was from CodeRabbit, not a human maintainer. The monitor suggested waiting and highlighted an optional Escape/Enter regression-test improvement. I reviewed the draft and decided not to post a reply or change the code because the PR was less than one day old, the required checks were passing, and no maintainer had requested further changes.
 
-**Status:** Awaiting maintainer review/merge. As last checked on 2026-11-08, PR #10853 was OPEN and MERGEABLE, with CodeRabbit's approval. Real macOS manual testing was still outstanding.
+**Status:** Awaiting maintainer review/merge. As checked on 2026-11-08 through the PR monitor, PR #10853 remained OPEN and MERGEABLE, with 106 passing checks and an automated CodeRabbit approval. No human maintainer response had been received at that time. Real macOS testing remained outstanding. I decided to wait rather than post an unnecessary reminder.
 
 **Toolkit**
 
@@ -555,27 +576,35 @@ The before/after reproduction showed that Ctrl+K changed from `defaultPrevented=
 
 ## Learnings and Reflections
 
-**Technical Skills Gained**
+**\*Technical Skills Gained**
 
-[What you learned technically, named concretely.]
+I learned how keyboard shortcuts work in a Vue editor built with tiptap and ProseMirror. Before this contribution, I had not worked with the editor's keymap or its link popup. I traced the toolbar's existing link flow and reused it instead of creating a separate popup. I also learned how to write Jest regression tests for keyboard events, selected text, and interactions between editor plugins.
+
+I became more familiar with the project's development workflow, including ESLint, Docker-based testing, Git branches, GitHub Actions, and pull request reviews. Working with the ship-gate and PR monitor helped me understand how automated tools can support a contribution without replacing my own decisions.
 
 **Challenges Overcome**
 
-[What was hard and how you solved it; point at the real events, the
-Toolkit blocks above are full of them.]
+One of the biggest difficulties was getting the project's tests to run correctly on Windows. Git's line-ending settings caused thousands of lint errors, and the full test suite failed on Windows because some tests expected Linux-style paths. I adjusted the local Git configuration and ran the full suite in Docker to match the CI environment.
+
+Another challenge appeared during code review. The link shortcut interfered with Mention and Hashtag suggestions, which my initial tests had not covered. I updated the shortcut handling and added regression tests to check that suggestions could return after closing the link popup.
+
+I also learned that a passing test does not always prove the intended behaviour. One of my early tests passed even before the feature existed because it interacted with a hidden input. I corrected the test to check that the popup actually opened before testing the link action.
 
 **What I'd Do Differently Next Time**
 
-[Reflection on your process.]
+Next time, I would check interactions with neighbouring editor features earlier, especially focus handling and suggestion menus. I would also separate the original reproduction test, feature tests, and regression tests from the beginning so that each test clearly proves one behaviour.
+
+I would prepare the Docker environment and Windows line-ending settings before starting implementation, rather than spending time fixing them during testing. I would also plan manual browser and accessibility checks earlier. The automated Mac-platform test was useful, but I still could not verify the shortcut on a real Mac.
+
+Finally, I would continue using AI tools for code exploration, testing, and review preparation, while checking their output against the repository's code and actual test results. The PR monitor was a useful example: it generated a possible next action, but I decided that waiting was more appropriate than posting a comment.
 
 ---
 
 ## Resources Used
 
-[What actually helped, not a reading list. List things this story
-already shows you using: the doc you followed to set the environment
-up, the thread that explained the bug, the person who answered you.
-One real entry beats ten plausible ones.]
-
-- [Link to documentation that helped]
-- [Discussion, issue, or post that helped]
+- [Ocelot-Social Issue #4666](https://github.com/Ocelot-Social-Community/Ocelot-Social/issues/4666) — The original issue describing the missing link shortcut and accessibility concern.
+- [Ocelot-Social PR #10853](https://github.com/Ocelot-Social-Community/Ocelot-Social/pull/10853) — My implementation, test changes, CI results, and CodeRabbit review feedback.
+- [Ocelot-Social CONTRIBUTING.md](https://github.com/Ocelot-Social-Community/Ocelot-Social/blob/master/CONTRIBUTING.md) — Used to understand the project's development and testing expectations.
+- [AI301 Unit 7 Starter](https://github.com/codepath/ai301-unit7-starter) — Used to install the ship-gate and prepare the project checks before opening the PR.
+- [AI301 Unit 8 Starter](https://github.com/codepath/ai301-unit8-starter) — Used to install the PR monitor, prepare my playbook, and evaluate the suggested response.
+- `CLAUDE.local.md`, `plan.md`, and `test_evidence.md` — My local notes documenting repository setup, implementation planning, reproduction, and test results.
