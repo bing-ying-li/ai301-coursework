@@ -11,7 +11,7 @@ files and no evidence uploads are part of Assignment 5.
 **Student:** BingYing Li
 **GitHub Username:** bing-ying-li
 **Issue:** https://github.com/Ocelot-Social-Community/Ocelot-Social/issues/4666
-**Pull Request:** [GitHub PR link, once opened]
+**Pull Request:** https://github.com/Ocelot-Social-Community/Ocelot-Social/pull/10853
 
 One repository, built across units 5 to 8, telling the whole story of your real
 contribution. Fill it as you work, not at the end — the sections below ask for evidence that
@@ -64,7 +64,7 @@ I installed the voice guard so my voice guide lives in one canonical file and a 
 
 **Unit 7: Built my contribution plan and verified the project checks — 2026-11-03**
 
-I used plan-check to review my implementation plan for Ocelot-Social #4666, and it returned accept with all seven required checks passing. I also prepared a ship-gate manifest covering webapp lint, design tokens, and the full unit test suite with its 95% coverage requirement. Running the checks exposed Windows-specific path failures and line-ending problems, so I configured Git to preserve LF endings and ran the full test suite inside the project's Docker environment. The baseline passed, and I recorded the commands, results, limitations, and workarounds in `plan.md` and `CLAUDE.local.md`.
+I used plan-check on `plan.md` and `plan-comment.md` for Ocelot-Social #4666; it returned accept with all seven required checks passing. I installed the ship-gate and wrote a manifest for webapp lint, design tokens, and the full unit suite with its 95% coverage threshold. Windows path assumptions and CRLF line endings broke initial runs, so I kept LF endings in this clone and ran the full suite in the project's Docker test image. On 2026-11-03, the ship-gate returned PASS on branch `4666-link-shortcut`: all three manifest checks and all seven pr-precheck checks passed; I kept the evidence and limitations in the local plan and test files.
 
 **Unit 8: [one line on the tool work]**
 
@@ -499,6 +499,13 @@ Nothing is committed, pushed or posted. The details are in `test_evidence.md` in
 - **My manual retest:** with a real keyboard I saw the same focus behaviour. An earlier report of mine that focus stayed in the URL input didn't happen again, so I left the code as it was.
 - **Still not run:** Firefox, NVDA, a direct check of the address bar, and a real Mac.
 
+**2026-11-08: PR reviews and CI follow-up**
+
+- PR #10853 is open against `master`. The final implementation commit checked was `c9c8546d3`.
+- I responded to CodeRabbit feedback by making the legend platform-specific and addressing the interaction between the link shortcut and Mention/Hashtag suggestions. I added regression tests for suggestions returning after the link popup is closed.
+- The focused tests passed (57/57). After the failed/cancelled CI jobs were rerun, GitHub showed 105 successful checks, 29 skipped and no failures or pending checks. CodeRabbit approved the changes, and the PR was mergeable, but it had not been merged by a maintainer.
+- Real macOS testing is still not complete. The earlier ship-gate PASS applies to the initial branch state, not the later review commits; the final GitHub CI result is recorded separately.
+
 **Toolkit**
 
 - Tool: Claude Code on a local branch, working from my accepted `plan.md`. It wrote the tests before the code, ran them on the original and changed source, and logged results to `test_evidence.md`. My ship manifest's checks ran the way the ship-gate runs them.
@@ -520,27 +527,29 @@ Nothing is committed, pushed or posted. The details are in `test_evidence.md` in
 
 ## Pull Request
 
-**PR Link:** [GitHub PR URL when opened]
+**PR Link:** https://github.com/Ocelot-Social-Community/Ocelot-Social/pull/10853
 
-**PR Description:** [what the PR says; much of the content above
-adapts into it]
+**PR Description:**
+
+I opened PR #10853 against Ocelot-Social's `master` branch to fix #4666. The editor already had a working link popup, but no shortcut to open it. The change adds a `Mod-k` binding (Ctrl+K on Windows/Linux and Cmd+K on macOS), reuses the toolbar's link popup and anchor, and lets the same shortcut close the URL input. It also adds a link shortcut to the editor legend without changing the read-only ContentViewer.
+
+The before/after reproduction showed that Ctrl+K changed from `defaultPrevented=false`, with the link input closed, to `defaultPrevented=true`, with the link input open. The initial feature checks passed: lint, design tokens and the Docker webapp unit suite (295 suites, 4,443 tests, 96.52% line coverage). The local ship-gate returned PASS on 2026-11-03, including seven successful pr-precheck checks. I disclosed the use of AI assistance in the PR description and stated the local testing limits, including no real-Mac or NVDA testing. Later reviews led to additional regression fixes and tests; the final PR has passed GitHub CI.
 
 **Maintainer Feedback:**
 
-- [Date]: [feedback received, or "none yet"; silence is a normal
-  state and costs you nothing]
-- [Date]: [how you addressed it]
+- **2026-11-03:** The local ship-gate returned PASS for the initial PR branch, after checking the manifest, plan, test evidence and draft description. This was a local preflight tool, not maintainer approval.
+- **By 2026-11-08:** CodeRabbit's automated review flagged issues around the shortcut legend and interaction with Mention/Hashtag suggestions. I updated the macOS legend to show `cmd + k`, changed the shortcut handling so the suggestion menu closes, and added regression coverage.
+- **By 2026-11-08:** A further review identified that closing suggestions could leave the Vue state inconsistent with an active plugin match. I adjusted the handling and regression test so suggestions can return as typing continues. The focused local tests passed (57/57).
+- **2026-11-08:** CodeRabbit approved the revised PR. GitHub reported 105 successful CI checks, 29 skipped and none failing or pending; the PR was marked mergeable. These results do not mean a human maintainer has merged it.
 
-**Status:** [Awaiting review / Iterating / Merged / Closed. The
-status is a fact you record, never a grade: the PR is graded as
-opened.]
+**Status:** Awaiting maintainer review/merge. As last checked on 2026-11-08, PR #10853 was OPEN and MERGEABLE, with CodeRabbit's approval. Real macOS manual testing was still outstanding.
 
 **Toolkit**
 
-- Tool:
-- What it produced:
-- Difficulties:
-- What changed:
+- Tool: The Unit 7 ship-gate (`check_gate.py`) with my `ship-manifest.md`, plus `pr-precheck` and GitHub PR checks. I used the local gate on the branch before opening the PR, then checked the GitHub reviews and CI after pushing review fixes.
+- What it produced: The 2026-11-03 `gate-log.md` records `verdict: PASS`, three successful manifest commands and seven passing pr-precheck criteria. The PR contains the implementation, test evidence, AI-assistance disclosure and later review commits; CodeRabbit ultimately approved it.
+- Difficulties: The Docker suite was slow on Windows; the first gate test intentionally blocked a command without PR text; the initial implementation exposed interactions with mention/hashtag suggestions that the first set of tests had not covered. Automated Mac-platform tests cannot substitute for a real Mac.
+- What changed: I kept the manifest's checks in a repeatable Docker/Node setup, corrected the suggestion-menu behavior and expanded regression coverage after review. I documented the remaining manual-test limits rather than claiming the work was fully tested on every platform.
 
 ---
 
