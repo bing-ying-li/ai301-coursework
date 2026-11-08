@@ -62,10 +62,9 @@ I upgraded issue-select to issue-scout and wrote a Python search strategy that r
 
 I installed the voice guard so my voice guide lives in one canonical file and a hook checks every `gh issue comment` before it goes out; the wiring test was stopped as expected. On Windows, `ln -sf` failed with "Operation not permitted" for all three skills, so I used the INSTALL.md fallback and made each skill's `voice-guide.md` a one-line pointer to the canonical guide. The guard passed my Ocelot-Social #4666 claim twice, once with the manual `--draft` check and once in the hook when I posted it. I then cloned Ocelot-Social, kept a `CLAUDE.local.md` out of git with `.git/info/exclude`, and filled it with the repo's contribution rules, the editor files my issue touches, and the test commands I verified by running them: the existing Editor tests passed as a baseline (8 suites, 107 tests), and my reproduction test passed 5 of 5 checks, showing that Ctrl+K and Cmd+K don't open the link input, though only in jsdom, not a real browser.
 
-**Unit 7: [one line on the tool work]**
+**Unit 7: Built my contribution plan and verified the project checks — 2026-11-03**
 
-[2-4 sentences: the ship-gate and your gate manifest. What it produced
-on your real branch, what fought you, what changed because of it.]
+I used plan-check to review my implementation plan for Ocelot-Social #4666, and it returned accept with all seven required checks passing. I also prepared a ship-gate manifest covering webapp lint, design tokens, and the full unit test suite with its 95% coverage requirement. Running the checks exposed Windows-specific path failures and line-ending problems, so I configured Git to preserve LF endings and ran the full test suite inside the project's Docker environment. The baseline passed, and I recorded the commands, results, limitations, and workarounds in `plan.md` and `CLAUDE.local.md`.
 
 **Unit 8: [one line on the tool work]**
 
