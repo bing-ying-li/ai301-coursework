@@ -1,0 +1,25 @@
+  console.warn
+    TextSelection endpoint not pointing into a node with inline content (doc)
+
+      434 |         attrs: typeAttrs[this.suggestionType],
+      435 |       })
+    > 436 |       this.editor.focus()
+          |                   ^
+      437 |     },
+      438 |     onUpdate(e) {
+      439 |       const content = e.getHTML()
+
+      at checkTextSelection (node_modules/prosemirror-state/dist/index.cjs:173:20)
+      at new TextSelection (node_modules/prosemirror-state/dist/index.cjs:182:5)
+      at TextSelection.create (node_modules/prosemirror-state/dist/index.cjs:239:14)
+      at Editor.setSelection (node_modules/tiptap/dist/tiptap.common.js:930:54)
+      at Editor.focus (node_modules/tiptap/dist/tiptap.common.js:919:10)
+      at VueComponent.selectItem (components/Editor/Editor.vue:436:19)
+      at VueComponent.navigateSuggestionList (components/Editor/Editor.vue:392:18)
+      at Object.navigateSuggestionList (components/Editor/Editor.spec.js:588:20)
+
+Test Suites: 8 passed, 8 total
+Tests:       107 passed, 107 total
+Snapshots:   0 total
+Time:        5.219 s
+Ran all test suites matching components/Editor.

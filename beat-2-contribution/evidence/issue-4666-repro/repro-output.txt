@@ -1,0 +1,25 @@
+  console.log
+    Ctrl+B defaultPrevented: true html: <p><strong>Example text</strong></p>
+
+      at Object.log (components/Editor/repro-4666.local.spec.js:54:13)
+
+  console.log
+    after toolbar click: isLinkInputActive=true linkInputShown=true contextMenuOpen=true
+
+      at Object.log (components/Editor/repro-4666.local.spec.js:65:13)
+
+  console.log
+    Ctrl+K: defaultPrevented=false isLinkInputActive=false linkInputShown=false html=<p>Example text</p>
+
+      at log (components/Editor/repro-4666.local.spec.js:83:13)
+
+  console.log
+    Cmd+K: defaultPrevented=false isLinkInputActive=false linkInputShown=false html=<p>Example text</p>
+
+      at log (components/Editor/repro-4666.local.spec.js:83:13)
+
+Test Suites: 1 passed, 1 total
+Tests:       5 passed, 5 total
+Snapshots:   0 total
+Time:        1.592 s, estimated 2 s
+Ran all test suites matching components/Editor/repro-4666.local.spec.js.
